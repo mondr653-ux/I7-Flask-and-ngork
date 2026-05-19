@@ -1,0 +1,119 @@
+from flask import Flask
+import json
+
+app = Flask(__name__)
+
+def read_json_file(filename):
+    with open(filename) as file:
+        data = json.load(file)
+    return data
+
+my_dict = read_json_file("inspections.json")
+records = my_dict["records"]
+
+
+@app.route('/')
+def info():
+    message = """
+    Hello, I am the Boston Food Inspection API.
+    You can call these routes:
+
+    /inspections/business/<businessname>   → records matching a business name
+    /inspections/license/<license_no>      → records for a license number
+    /inspections/result/<result>           → records by result (HE_Pass, HE_Fail, etc.)
+    /inspections/city/<city>               → records by city
+    /violations/level/<level>              → violations by level (* ** ***)
+    /stats                                 → summary counts
+    """
+    return message
+
+
+@app.route('/inspections/business/<businessname>')
+def get_by_business(businessname):
+    matches = []
+    for record in records:
+        if businessname.lower() in record['businessname'].lower():
+            matches.append(record)
+    if matches:
+        return json.dumps(matches, indent=2)
+    return 'No records found for business: ' + businessname
+
+
+@app.route('/inspections/license/<int:license_no>')
+def get_by_license(license_no):
+    matches = []
+    for record in records:
+        if record['licenseno'] == license_no:
+            matches.append(record)
+    if matches:
+        return json.dumps(matches, indent=2)
+    return 'No records found for license: ' + str(license_no)
+
+
+@app.route('/inspections/result/<result>')
+def get_by_result(result):
+    matches = []
+    for record in records:
+        if record['result'].lower() == result.lower():
+            matches.append(record)
+    if matches:
+        return json.dumps(matches[:50], indent=2)
+    return 'No records found for result: ' + result
+
+
+@app.route('/inspections/city/<city>')
+def get_by_city(city):
+    matches = []
+    for record in records:
+        if record['city'].lower() == city.lower():
+            matches.append(record)
+    if matches:
+        return json.dumps(matches[:50], indent=2)
+    return 'No records found for city: ' + city
+
+
+@app.route('/violations/level/<level>')
+def get_by_violation_level(level):
+    matches = []
+    for record in records:
+        if record['viollevel'] == level:
+            matches.append(record)
+    if matches:
+        return json.dumps(matches[:50], indent=2)
+    return 'No violations found for level: ' + level
+
+
+@app.route('/stats')
+def stats():
+    total = len(records)
+    active = 0
+    inactive = 0
+    he_pass = 0
+    he_fail = 0
+    has_violation = 0
+
+    for record in records:
+        if record['licstatus'] == 'Active':
+            active += 1
+        if record['licstatus'] == 'Inactive':
+            inactive += 1
+        if record['result'] == 'HE_Pass':
+            he_pass += 1
+        if record['result'] == 'HE_Fail':
+            he_fail += 1
+        if record['violation'] != '':
+            has_violation += 1
+
+    result = {
+        'total_records':    total,
+        'active_licenses':  active,
+        'inactive_licenses':inactive,
+        'he_pass':          he_pass,
+        'he_fail':          he_fail,
+        'has_violation':    has_violation
+    }
+    return json.dumps(result, indent=2)
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
